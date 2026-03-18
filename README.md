@@ -4,7 +4,7 @@ Iot Air Monitoring System for Productivity Improvement, Internet of Things proje
 ## Group Members
 [Dakshita Minocha]()
 
-[Damiano Ferioli]()
+[Damiano Ferioli](https://www.linkedin.com/in/damiano-ferioli-5366783b8/)
 
 Missing Member (!)
 
