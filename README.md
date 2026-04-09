@@ -6,7 +6,7 @@ Iot Air Monitoring System for Productivity Improvement, Internet of Things proje
 
 [Damiano Ferioli](https://www.linkedin.com/in/damiano-ferioli-5366783b8/)
 
-Missing Member (!)
+[Ebrahim Afridi](https://www.linkedin.com/in/ebrahimafridi)
 
 
 # First delivery
