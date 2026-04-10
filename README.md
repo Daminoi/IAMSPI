@@ -17,3 +17,4 @@ The presentation of the project can be found in Booklets/Presentation_IoTeam2026
 The wiring diagram of the current prototype.
 
 A simple demonstration of the core functionality is available on Youtube.
+[Link to the YT video](https://youtu.be/BHO6ZXLrhL8)
