@@ -14,5 +14,6 @@ The presentation of the project can be found in Booklets/Presentation_IoTeam2026
 
 # Second Delivery
 ![Wiring of the project as of the second delivery](images/IAMSPI_v1-2.png)
+The wiring diagram of the current prototype.
 
 A simple demonstration of the core functionality is available on Youtube.
