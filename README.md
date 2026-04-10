@@ -10,3 +10,9 @@ Iot Air Monitoring System for Productivity Improvement, Internet of Things proje
 
 
 # First delivery
+The presentation of the project can be found in Booklets/Presentation_IoTeam2026_definitive.pdf.
+
+# Second Delivery
+![Wiring of the project as of the second delivery](images/IAMSPI_v1-2.png)
+
+A simple demonstration of the core functionality is available on Youtube.
