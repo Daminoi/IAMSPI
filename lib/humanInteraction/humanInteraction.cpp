@@ -108,67 +108,84 @@ void startup_welcome()
 	playStartUpChime();
 }
 
+void setLED (int green, int blue, int red){
+	digitalWrite(STATUS_GLED, green);
+	digitalWrite(STATUS_BLED, blue);
+	digitalWrite(STATUS_RLED, red);
+}
+
 void setLEDStatusRED()
 {
-	digitalWrite(STATUS_BLED, LOW);
-	digitalWrite(STATUS_GLED, LOW);
+	setLED (LOW, LOW, HIGH);
+	// digitalWrite(STATUS_BLED, LOW);
+	// digitalWrite(STATUS_GLED, LOW);
 
-	digitalWrite(STATUS_RLED, HIGH);
+	// digitalWrite(STATUS_RLED, HIGH);
 }
 
 void setLEDStatusGREEN()
 {
-	digitalWrite(STATUS_BLED, LOW);
-	digitalWrite(STATUS_RLED, LOW);
+	setLED (HIGH, LOW, LOW);
+	// digitalWrite(STATUS_BLED, LOW);
+	// digitalWrite(STATUS_RLED, LOW);
 
-	digitalWrite(STATUS_GLED, HIGH);
+	// digitalWrite(STATUS_GLED, HIGH);
 }
 
 void setLEDStatusBLUE()
 {
-	digitalWrite(STATUS_RLED, LOW);
-	digitalWrite(STATUS_GLED, LOW);
+	setLED (LOW, HIGH, LOW);
+	// digitalWrite(STATUS_RLED, LOW);
+	// digitalWrite(STATUS_GLED, LOW);
 
-	digitalWrite(STATUS_BLED, HIGH);
+	// digitalWrite(STATUS_BLED, HIGH);
 }
 
 void setLEDStatusOFF()
 {
-	digitalWrite(STATUS_RLED, LOW);
-	digitalWrite(STATUS_GLED, LOW);
-	digitalWrite(STATUS_BLED, LOW);
+	setLED (LOW, LOW, LOW);
+	// digitalWrite(STATUS_RLED, LOW);
+	// digitalWrite(STATUS_GLED, LOW);
+	// digitalWrite(STATUS_BLED, LOW);
 }
 
+void setAQI (int green, int yellow, int red){
+	digitalWrite(GREEN_LED, green);
+	digitalWrite(YELLOW_LED, yellow);
+	digitalWrite(RED_LED, red);
+}
 
 void setAqiRED()
 {
-	digitalWrite(GREEN_LED, LOW);
-	digitalWrite(YELLOW_LED, LOW);
-
-	digitalWrite(RED_LED, HIGH);
+	setAQI(LOW, LOW, HIGH);
+	// digitalWrite(GREEN_LED, LOW);
+	// digitalWrite(YELLOW_LED, LOW);
+	// digitalWrite(RED_LED, HIGH);
 }
 
 void setAqiYELLOW()
 {
-	digitalWrite(GREEN_LED, LOW);
-	digitalWrite(RED_LED, LOW);
+	setAQI(LOW, HIGH, LOW);
+	// digitalWrite(GREEN_LED, LOW);
+	// digitalWrite(RED_LED, LOW);
 
-	digitalWrite(YELLOW_LED, HIGH);
+	// digitalWrite(YELLOW_LED, HIGH);
 }
 
 void setAqiGREEN()
 {
-	digitalWrite(YELLOW_LED, LOW);
-	digitalWrite(RED_LED, LOW);
-
-	digitalWrite(GREEN_LED, HIGH);
+	setAQI(HIGH, LOW, LOW);
+	// digitalWrite(YELLOW_LED, LOW);
+	// digitalWrite(RED_LED, LOW);
+	// digitalWrite(GREEN_LED, HIGH);
 }
 
 void setAqiOFF()
 {
-	digitalWrite(GREEN_LED, LOW);
-	digitalWrite(YELLOW_LED, LOW);
-	digitalWrite(RED_LED, LOW);
+	setAQI(LOW, LOW, LOW);
+	// digitalWrite(GREEN_LED, LOW);
+	// digitalWrite(YELLOW_LED, LOW);
+	// digitalWrite(RED_LED, LOW);
 }
 
 // The irrecoverable error status can be immediately distinguished because the status led goes back red to blue to red forever.
