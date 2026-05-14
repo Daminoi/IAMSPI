@@ -110,20 +110,20 @@ void getSCD41Reading (sensorMeasure &data) {
     // In the datasheet it is reported that the time necessary to take a sample is 5000 ms (5 seconds) maximum.
     // Therefore we can save power by going in LIGHT SLEEP mode while waiting for the SCD41 to take a sample.
     Serial.println("Sensor measuring (Light Sleep)...");
-    // esp_sleep_enable_timer_wakeup(5 * U_S_TO_S_FACTOR);
-    // esp_light_sleep_start();
+    esp_sleep_enable_timer_wakeup(5 * U_S_TO_S_FACTOR);
+    esp_light_sleep_start();
 
     if (scd41.readMeasurement(data.co2, data.temp, data.rh) != SCD41_NO_ERROR) {
         Serial.println("Sensor Error!\nTrying again ...");
-        // esp_sleep_enable_timer_wakeup(5 * U_S_TO_S_FACTOR);
-        // esp_light_sleep_start();
+        esp_sleep_enable_timer_wakeup(5 * U_S_TO_S_FACTOR);
+        esp_light_sleep_start();
         if (scd41.readMeasurement(data.co2, data.temp, data.rh) != SCD41_NO_ERROR) {
             Serial.println("Sensor Error!");
             setLEDStatusRED();
         }
     }
     Serial.printf ("CO2: %d ppm, Temp: %.2f °C, RH: %.2f %%\n", data.co2, data.temp, data.rh);
-    // scd41.powerDown();
+    scd41.powerDown();
 }
 
 void handleLogic(sensorMeasure data) {
@@ -131,11 +131,11 @@ void handleLogic(sensorMeasure data) {
 	measurements[nCurrStoredMeasures].temp 	= data.temp;
 	measurements[nCurrStoredMeasures].rh 	= data.rh;
 	nCurrStoredMeasures++;
-    if (data.co2 >= CO2_VERY_HIGH) {
+    if (data.co2 - CO2_VERY_HIGH >= CO2_ERROR) {
         pre_alert = 1;
         setAqiRED();
         // Use a non-blocking chime or a separate task for buzzer
-    } else if (data.co2 >= CO2_MEDIUM) {
+    } else if (data.co2 - CO2_MEDIUM >= CO2_ERROR || data.temp - TEMP_HIGH >= TEMP_ERROR || data.rh - RH_HIGH >= RH_ERROR) {
         setAqiYELLOW();
     } else {
         setAqiGREEN();

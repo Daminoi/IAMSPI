@@ -1,7 +1,4 @@
-#include "humanInteraction.h"
-
-#include "Arduino.h"
-#include "../../include/pinDefinitions.h"
+#include "Globals.h"
 
 void playStartUpChime()
 {
@@ -117,36 +114,21 @@ void setLED (int green, int blue, int red){
 void setLEDStatusRED()
 {
 	setLED (LOW, LOW, HIGH);
-	// digitalWrite(STATUS_BLED, LOW);
-	// digitalWrite(STATUS_GLED, LOW);
-
-	// digitalWrite(STATUS_RLED, HIGH);
 }
 
 void setLEDStatusGREEN()
 {
 	setLED (HIGH, LOW, LOW);
-	// digitalWrite(STATUS_BLED, LOW);
-	// digitalWrite(STATUS_RLED, LOW);
-
-	// digitalWrite(STATUS_GLED, HIGH);
 }
 
 void setLEDStatusBLUE()
 {
 	setLED (LOW, HIGH, LOW);
-	// digitalWrite(STATUS_RLED, LOW);
-	// digitalWrite(STATUS_GLED, LOW);
-
-	// digitalWrite(STATUS_BLED, HIGH);
 }
 
 void setLEDStatusOFF()
 {
 	setLED (LOW, LOW, LOW);
-	// digitalWrite(STATUS_RLED, LOW);
-	// digitalWrite(STATUS_GLED, LOW);
-	// digitalWrite(STATUS_BLED, LOW);
 }
 
 void setAQI (int green, int yellow, int red){
@@ -158,34 +140,21 @@ void setAQI (int green, int yellow, int red){
 void setAqiRED()
 {
 	setAQI(LOW, LOW, HIGH);
-	// digitalWrite(GREEN_LED, LOW);
-	// digitalWrite(YELLOW_LED, LOW);
-	// digitalWrite(RED_LED, HIGH);
 }
 
 void setAqiYELLOW()
 {
 	setAQI(LOW, HIGH, LOW);
-	// digitalWrite(GREEN_LED, LOW);
-	// digitalWrite(RED_LED, LOW);
-
-	// digitalWrite(YELLOW_LED, HIGH);
 }
 
 void setAqiGREEN()
 {
 	setAQI(HIGH, LOW, LOW);
-	// digitalWrite(YELLOW_LED, LOW);
-	// digitalWrite(RED_LED, LOW);
-	// digitalWrite(GREEN_LED, HIGH);
 }
 
 void setAqiOFF()
 {
 	setAQI(LOW, LOW, LOW);
-	// digitalWrite(GREEN_LED, LOW);
-	// digitalWrite(YELLOW_LED, LOW);
-	// digitalWrite(RED_LED, LOW);
 }
 
 // The irrecoverable error status can be immediately distinguished because the status led goes back red to blue to red forever.
