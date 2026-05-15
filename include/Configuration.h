@@ -1,11 +1,9 @@
 #ifndef CONFIGURATION_H
 #define CONFIGURATION_H
 
-#include <Globals.h>
-
 // Configuration & Constants
 #define U_S_TO_S_FACTOR 1000000ULL
-#define DEEP_SLEEP_SECONDS 300 
+#define DEEP_SLEEP_SECONDS 10 
 
 // Thresholds
 const uint16_t CO2_VERY_HIGH = 4000;

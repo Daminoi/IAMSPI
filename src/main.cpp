@@ -1,4 +1,6 @@
 #include <Globals.h>
+#include "humanInteraction.h"
+#include "LightsOn.h"
 
 struct sensorMeasure {
     uint16_t co2;
@@ -9,6 +11,7 @@ struct sensorMeasure {
 // --- Persistent Memory (RTC RAM) ---
 RTC_DATA_ATTR uint8_t is_first_boot = 1;
 RTC_DATA_ATTR uint8_t pre_alert = 0;
+RTC_DATA_ATTR uint8_t light_On = 0;
 RTC_DATA_ATTR struct sensorMeasure measurements[12];
 RTC_DATA_ATTR uint8_t nCurrStoredMeasures = 0;
 
@@ -21,38 +24,51 @@ RTC_DATA_ATTR uint8_t nCurrStoredMeasures = 0;
 
 // Global Sensor Object
 SensirionI2cScd4x scd41;
+// SensirionI2cScd4x scd41;
+int16_t scd41Error;
+char errorMessage[64];
 
 // --- Function Declarations ---
 void runSystemSequence();
 void handleSensing(sensorMeasure &data);
 void handleLogic(sensorMeasure data);
 void goToDeepSleep();
-void getSCD41Reading (sensorMeasure &data);
+int getSCD41Reading (sensorMeasure &data);
 void wakeSCDAfterDeepSleep();
 
 void setup() {
     Serial.begin(115200);
 	setLEDStatusRED();
-	while(!Serial){			// Wait for the serial connection to complete, if the status LED remains RED we can immediately tell something is wrong with the serial
+	while(!Serial)			// Wait for the serial connection to complete, if the status LED remains RED we can immediately tell something is wrong with the serial
 		vTaskDelay(200 / portTICK_PERIOD_MS);
-	}
 	setLEDStatusOFF();
     
     // 1. Initialize Hardware
     pinMode(VE_ENABLE, OUTPUT);
     digitalWrite(VE_ENABLE, LOW); // Power sensor
+    pinMode(LDR_POWER, OUTPUT); // power LDR
+    digitalWrite(LDR_INPUT, LOW); // low by default
+
     Wire.begin(SDA_GPIO, SCL_GPIO);
     scd41.begin(Wire, SCD41_I2C_ADDR_62);
 
     if (is_first_boot) {
         Serial.println("Initial Boot: Performing Self-Check...");
+        setIlluminationBaseline();
         // Add startup_welcome() here
-        is_first_boot = 0;
+        light_On = getIllumination ();
+        
+        if (!light_On) {
+            // If we woke up and the light is still off, it means we are in a low-light environment and we should skip the sensor reading and go back to sleep immediately.
+            Serial.println("Low light detected on wakeup, going back to sleep...");
+            goToDeepSleep();
+            return;
+        }
         wakeSCDAfterDeepSleep ();
+        is_first_boot = 0;
     }
     else scd41.wakeUp();
 
-    getSCD41Reading(measurements[0]); // Get initial reading to ensure sensor is working
     setLEDStatusGREEN(); 	// The green status LED will stay on while the board is in light sleep, only for debugging purposes
 
     // 2. Start the main logic sequence as a Task
@@ -73,38 +89,46 @@ void loop() {
 // --- Main Logic Flow ---
 void runSystemSequence() {
     sensorMeasure currentData;
-
-    // Phase 1: Sensing
-    handleSensing(currentData);
-
-    // Phase 2: Logic & UI
-    handleLogic(currentData);
-
-    // Phase 3: Data Storage and Transmission (If buffer full or Alert)
-    if (nCurrStoredMeasures < 12)
-        measurements[nCurrStoredMeasures++] = currentData;
-    else if (nCurrStoredMeasures >= 12) {
-        Serial.println("Triggering LoRa Uplink...");
-        // triggerLoRaSend(); 
-        nCurrStoredMeasures = 0;
-        measurements[nCurrStoredMeasures++] = currentData;
-    } else if (pre_alert == 1) {
-        Serial.println("Triggering LoRa Uplink...");
-        // triggerLoRaSend(); 
-        pre_alert = 0;
+    
+    light_On = getIllumination ();
+    if (!light_On) {
+        // If we woke up and the light is still off, it means we are in a low-light environment and we should skip the sensor reading and go back to sleep immediately.
+        Serial.println("Low light detected on wakeup, going back to sleep...");
+        goToDeepSleep();
+        return;
     }
+    
+    for (int i = 0; i < 3; i++) {
+        // Phase 1: Sensing
+        int error = getSCD41Reading(currentData);
+        if (currentData.co2 && currentData.temp && currentData.rh) {
+            // Phase 2: Logic & UI
+            handleLogic(currentData);
 
+            // Phase 3: Data Storage and Transmission (If buffer full or Alert)
+            if (nCurrStoredMeasures < 12)
+                measurements[nCurrStoredMeasures++] = currentData;
+            else if (nCurrStoredMeasures >= 12) {
+                Serial.println("Triggering LoRa Uplink...");
+                // triggerLoRaSend(); 
+                nCurrStoredMeasures = 0;
+                measurements[nCurrStoredMeasures++] = currentData;
+            } else if (pre_alert == 1) {
+                Serial.println("Triggering LoRa Uplink...");
+                // triggerLoRaSend(); 
+                pre_alert = 0;
+            }
+            break;
+        }
+        Serial.println("Reading failed, retrying...");
+    }
+    
     // Phase 5: Shutdown
     goToDeepSleep();
 }
 
-// sense photoresistor, if light level is sufficient put esp32 in light sleep and proceed to read SCD41
-void handleSensing(sensorMeasure &data) {
-    getSCD41Reading(data);
-}
-
 // Turns on scd42, requests data. Board is in light sleep while waiting for data.
-void getSCD41Reading (sensorMeasure &data) {
+int getSCD41Reading (sensorMeasure &data) {
     scd41.measureSingleShot();
 
     // In the datasheet it is reported that the time necessary to take a sample is 5000 ms (5 seconds) maximum.
@@ -112,9 +136,11 @@ void getSCD41Reading (sensorMeasure &data) {
     Serial.println("Sensor measuring (Light Sleep)...");
     esp_sleep_enable_timer_wakeup(5 * U_S_TO_S_FACTOR);
     esp_light_sleep_start();
-
-    if (scd41.readMeasurement(data.co2, data.temp, data.rh) != SCD41_NO_ERROR) {
+    scd41Error = scd41.readMeasurement(data.co2, data.temp, data.rh);
+    if (scd41Error != SCD41_NO_ERROR) {
         Serial.println("Sensor Error!\nTrying again ...");
+        errorToString(scd41Error, errorMessage, sizeof(errorMessage));
+        Serial.println(errorMessage);
         esp_sleep_enable_timer_wakeup(5 * U_S_TO_S_FACTOR);
         esp_light_sleep_start();
         if (scd41.readMeasurement(data.co2, data.temp, data.rh) != SCD41_NO_ERROR) {
@@ -124,6 +150,7 @@ void getSCD41Reading (sensorMeasure &data) {
     }
     Serial.printf ("CO2: %d ppm, Temp: %.2f °C, RH: %.2f %%\n", data.co2, data.temp, data.rh);
     scd41.powerDown();
+    return SCD41_NO_ERROR;
 }
 
 void handleLogic(sensorMeasure data) {
@@ -146,45 +173,39 @@ void handleLogic(sensorMeasure data) {
     setAqiOFF();
 }
 
-void wakeSCDAfterDeepSleep() {
-	SensirionI2cScd4x scd41Sensor;
-	int16_t scd41Error;
-	char errorMessage[64];
-	
-	scd41Sensor.begin(Wire, SCD41_I2C_ADDR_62);
-	
+void wakeSCDAfterDeepSleep() {	
+	scd41.begin(Wire, SCD41_I2C_ADDR_62);
+
     uint64_t scd41SerialNumber;
-		
-		setLEDStatusRED();
-		scd41Error = scd41Sensor.wakeUp();
-		if(scd41Error != SCD41_NO_ERROR)
-		{
-			Serial.println("Error while trying to wake up the SCD41!");
-			unrecoverableErrorStatus();
-		}
-		setLEDStatusOFF();
 
-		// Asking the SCD41 to provide its serial number is one way to check if it is in idle state
-		setLEDStatusRED();
-		scd41Error = scd41Sensor.getSerialNumber(scd41SerialNumber);
-		if (scd41Error != SCD41_NO_ERROR)
-		{
-			Serial.println("Failure to obtain the SCD41 serial number!");
-			errorToString(scd41Error, errorMessage, sizeof(errorMessage));
-			Serial.println(errorMessage);
-			unrecoverableErrorStatus();
-		}
-		setLEDStatusOFF();
+    setLEDStatusRED();
+    scd41Error = scd41.wakeUp();
+    if (scd41Error != SCD41_NO_ERROR) {
+        Serial.println("Error while trying to wake up the SCD41!");
+        unrecoverableErrorStatus();
+    }
+    setLEDStatusOFF();
 
-		Serial.print("SCD41's serial number: 0x");
-    	Serial.print((uint32_t)(scd41SerialNumber >> 32), HEX);
-    	Serial.println((uint32_t)(scd41SerialNumber & 0xFFFFFFFF), HEX);
+	// Asking the SCD41 to provide its serial number is one way to check if it is in idle state
+	setLEDStatusRED();
+	scd41Error = scd41.getSerialNumber(scd41SerialNumber);
+	if (!scd41SerialNumber){
+		Serial.println("Failure to obtain the SCD41 serial number!");
+		errorToString(scd41Error, errorMessage, sizeof(errorMessage));
+		Serial.println(errorMessage);
+		unrecoverableErrorStatus();
+	}
+	setLEDStatusOFF();
 
-		Serial.println("Power on procedure completed with SUCCESS!");
+    Serial.print("SCD41's serial number: 0x");
+    Serial.print((uint32_t)(scd41SerialNumber >> 32), HEX);
+    Serial.println((uint32_t)(scd41SerialNumber & 0xFFFFFFFF), HEX);
 
-		setLEDStatusGREEN();
-		vTaskDelay(2000 / portTICK_PERIOD_MS);
-		setLEDStatusOFF();
+    Serial.println("Power on procedure completed with SUCCESS!");
+
+    setLEDStatusGREEN();
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    setLEDStatusOFF();
 }
 
 // puts esp32 to deep sleep

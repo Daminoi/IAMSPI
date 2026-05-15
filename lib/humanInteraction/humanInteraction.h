@@ -1,6 +1,10 @@
 #ifndef HUMANINTERACTION_H
 #define HUMANINTERACTION_H
 
+#include <Arduino.h>
+#include "PinDefinitions.h"
+
+
 void playStartUpChime();
 void playPreAlertChime();
 
