@@ -30,7 +30,6 @@ char errorMessage[64];
 
 // --- Function Declarations ---
 void runSystemSequence();
-void handleSensing(sensorMeasure &data);
 void handleLogic(sensorMeasure data);
 void goToDeepSleep();
 int getSCD41Reading (sensorMeasure &data);
@@ -67,7 +66,7 @@ void setup() {
         wakeSCDAfterDeepSleep ();
         is_first_boot = 0;
     }
-    else scd41.wakeUp();
+    else scd41.wakeUp(); // TODO: is this required?
 
     setLEDStatusGREEN(); 	// The green status LED will stay on while the board is in light sleep, only for debugging purposes
 
@@ -129,6 +128,7 @@ void runSystemSequence() {
 
 // Turns on scd42, requests data. Board is in light sleep while waiting for data.
 int getSCD41Reading (sensorMeasure &data) {
+    scd41.wakeUp(); // TODO: is this required?
     scd41.measureSingleShot();
 
     // In the datasheet it is reported that the time necessary to take a sample is 5000 ms (5 seconds) maximum.

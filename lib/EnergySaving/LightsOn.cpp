@@ -11,8 +11,10 @@ const int sampleIntervalMs = 500;     // read sensor every 500 ms
 const int lightOnThresholdDelta = 150; // threshold above baseline for "lights on"
 const int lightOffThresholdDelta = 50; // lower threshold for hysteresis
 
-int lightInit = 0;          // initial baseline reading
-float lightFiltered = 0;    // smoothed sensor value
+RTC_DATA_ATTR uint16_t lightInit = 0; // initial baseline reading
+RTC_DATA_ATTR float lightFiltered = 0; // initial baseline reading
+
+// float lightFiltered = 0;    // smoothed sensor value
 bool lightsOn = false;      // current interpreted state
 unsigned long lastSampleMs = 0;
 
@@ -32,12 +34,6 @@ void setIlluminationBaseline() {
 }
 
 bool getIllumination() {
-  // unsigned long now = millis();
-  // if (now - lastSampleMs < sampleIntervalMs) {
-  //   return lightsOn; // Not time to sample yet, return current state
-  // }
-  // lastSampleMs = now;
-
   uint16_t rawValue = readLDR();
 
   // Apply exponential smoothing to reduce jitter.
@@ -47,16 +43,18 @@ bool getIllumination() {
   lightsOn = lightFiltered > lightInit + lightOnThresholdDelta;
 
   Serial.printf("LIGHT: raw= %f, filtered= %f, state= %s\n", (float)rawValue, lightFiltered, lightsOn ? "ON" : "OFF");
+  Serial.printf("LightInit: %f, Threshold: %f\n", (float)lightInit, (float)lightInit + lightOnThresholdDelta);
   return lightsOn;
 }
 
 uint16_t readLDR () {
   digitalWrite(LDR_POWER, HIGH); // Power the LDR circuit
-    delay(100); // Short delay to allow the sensor to stabilize after powering it on
-    uint16_t rawValue = analogRead(LDR_INPUT);
-    digitalWrite(LDR_POWER, LOW); // Power down the LDR circuit to save energy
-    return rawValue;
+  delay(100); // Short delay to allow the sensor to stabilize after powering it on
+  uint16_t rawValue = analogRead(LDR_INPUT);
+  digitalWrite(LDR_POWER, LOW); // Power down the LDR circuit to save energy
+  return rawValue;
 }
+
 // notes:
 // value at 3:30PM is pretty high (on avg 3984)
 // with torch: 4095
