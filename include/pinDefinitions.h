@@ -30,9 +30,9 @@
 // for clarity, we redefine the pins we want to use for I2C
 #define SCL_GPIO    42
 
-#define LDR_POWER   17
+#define LDR_POWER   06
 
-#define LDR_INPUT   18
+#define LDR_INPUT   07
 
 #define VE_ENABLE   36
 
