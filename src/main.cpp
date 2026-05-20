@@ -14,6 +14,7 @@ RTC_DATA_ATTR uint8_t pre_alert = 0;
 RTC_DATA_ATTR uint8_t light_On = 0;
 RTC_DATA_ATTR struct sensorMeasure measurements[12];
 RTC_DATA_ATTR uint8_t nCurrStoredMeasures = 0;
+RTC_DATA_ATTR uint8_t measurementIndex = 0;
 
 
 #ifdef SCD41_NO_ERROR
@@ -27,6 +28,7 @@ SensirionI2cScd4x scd41;
 // SensirionI2cScd4x scd41;
 int16_t scd41Error;
 char errorMessage[64];
+int lastPrinted = 0;
 
 // --- Function Declarations ---
 void runSystemSequence();
@@ -41,6 +43,7 @@ void setup() {
 	while(!Serial)			// Wait for the serial connection to complete, if the status LED remains RED we can immediately tell something is wrong with the serial
 		vTaskDelay(200 / portTICK_PERIOD_MS);
 	setLEDStatusOFF();
+    Serial.flush();
     
     // 1. Initialize Hardware
     pinMode(VE_ENABLE, OUTPUT);
@@ -149,6 +152,11 @@ int getSCD41Reading (sensorMeasure &data) {
         }
     }
     Serial.printf ("CO2: %d ppm, Temp: %.2f °C, RH: %.2f %%\n", data.co2, data.temp, data.rh);
+    Serial.printf (">co2:%d:%u|\n", measurementIndex, data.co2);
+    Serial.printf (">temp:%d:%.2f|\n", measurementIndex, data.temp);
+    Serial.printf (">humidity:%d:%.2f|\n", measurementIndex++,  data.rh);
+    
+    Serial.flush();
     scd41.powerDown();
     return SCD41_NO_ERROR;
 }
