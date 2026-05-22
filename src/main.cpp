@@ -1,20 +1,12 @@
 #include <Globals.h>
 #include "humanInteraction.h"
 #include "LightsOn.h"
-
-struct sensorMeasure {
-    uint16_t co2;
-    float temp;
-    float rh;
-};
+#include "Prediction.h"
 
 // --- Persistent Memory (RTC RAM) ---
 RTC_DATA_ATTR uint8_t is_first_boot = 1;
 RTC_DATA_ATTR uint8_t pre_alert = 0;
 RTC_DATA_ATTR uint8_t light_On = 0;
-RTC_DATA_ATTR struct sensorMeasure measurements[12];
-RTC_DATA_ATTR uint8_t nCurrStoredMeasures = 0;
-RTC_DATA_ATTR uint8_t measurementIndex = 0;
 
 
 #ifdef SCD41_NO_ERROR
@@ -25,10 +17,13 @@ RTC_DATA_ATTR uint8_t measurementIndex = 0;
 
 // Global Sensor Object
 SensirionI2cScd4x scd41;
-// SensirionI2cScd4x scd41;
 int16_t scd41Error;
 char errorMessage[64];
 int lastPrinted = 0;
+
+const float cO2Alpha = 0.15;
+uint8_t isFirstReading = 1;
+
 
 // --- Function Declarations ---
 void runSystemSequence();
@@ -82,6 +77,16 @@ void setup() {
         1,
         NULL
     );
+
+    xTaskCreatePinnedToCore(
+        [](void * o) { processingTask (measurements); },     // Task function
+        "ProcTask",         // Task name tag
+        4096,               // Stack size
+        NULL,               // Parameters
+        3,                  // Priority execution rank
+        NULL,               // Task Handle tracking reference
+        1                   // Pin execution specifically to App Core 1
+        );
 }
 
 void loop() {
@@ -103,6 +108,14 @@ void runSystemSequence() {
     for (int i = 0; i < 3; i++) {
         // Phase 1: Sensing
         int error = getSCD41Reading(currentData);
+        float filteredCO2 = 0.0f;
+
+        if (isFirstReading) {
+            isFirstReading = 0;
+            filteredCO2 = currentData.co2;
+        }
+        else 
+        currentData.co2 = (cO2Alpha * currentData.co2) + ((1.0f - cO2Alpha) * filteredCO2);
         if (currentData.co2 && currentData.temp && currentData.rh) {
             // Phase 2: Logic & UI
             handleLogic(currentData);
@@ -133,7 +146,7 @@ void runSystemSequence() {
 int getSCD41Reading (sensorMeasure &data) {
     scd41.wakeUp(); // TODO: is this required?
     scd41.measureSingleShot();
-
+    
     // In the datasheet it is reported that the time necessary to take a sample is 5000 ms (5 seconds) maximum.
     // Therefore we can save power by going in LIGHT SLEEP mode while waiting for the SCD41 to take a sample.
     Serial.println("Sensor measuring (Light Sleep)...");
@@ -151,6 +164,8 @@ int getSCD41Reading (sensorMeasure &data) {
             setLEDStatusRED();
         }
     }
+
+
     Serial.printf ("CO2: %d ppm, Temp: %.2f °C, RH: %.2f %%\n", data.co2, data.temp, data.rh);
     Serial.printf (">co2:%d:%u|\n", measurementIndex, data.co2);
     Serial.printf (">temp:%d:%.2f|\n", measurementIndex, data.temp);
@@ -217,6 +232,7 @@ void wakeSCDAfterDeepSleep() {
 }
 
 // puts esp32 to deep sleep
+// deep sleep entirely kills freertos tasks.
 void goToDeepSleep() {
     Serial.println("Entering Deep Sleep...");
     esp_deep_sleep(DEEP_SLEEP_SECONDS * U_S_TO_S_FACTOR);
