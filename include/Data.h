@@ -1,3 +1,6 @@
+#ifndef DATA_H
+#define DATA_H
+
 #include <Arduino.h>
 
 struct sensorMeasure {
@@ -17,3 +20,5 @@ struct PredictionResult {
 extern RTC_DATA_ATTR struct sensorMeasure measurements[WINDOW_SIZE];
 extern RTC_DATA_ATTR uint8_t nCurrStoredMeasures;
 extern RTC_DATA_ATTR uint8_t measurementIndex;
+
+#endif /* DATA_H */

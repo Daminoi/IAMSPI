@@ -2,7 +2,7 @@
 #define HUMANINTERACTION_H
 
 #include <Arduino.h>
-#include "PinDefinitions.h"
+#include "pinDefinitions.h"
 
 
 void playStartUpChime();
