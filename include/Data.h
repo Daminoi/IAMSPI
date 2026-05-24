@@ -1,3 +1,6 @@
+#ifndef DATA_H
+#define DATA_H
+
 #include <Arduino.h>
 
 struct sensorMeasure {
@@ -11,3 +14,5 @@ struct sensorMeasure {
 RTC_DATA_ATTR struct sensorMeasure measurements[WINDOW_SIZE];
 RTC_DATA_ATTR uint8_t nCurrStoredMeasures = 0;
 RTC_DATA_ATTR uint8_t measurementIndex = 0;
+
+#endif /* DATA_H */

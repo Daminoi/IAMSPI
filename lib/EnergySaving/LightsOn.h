@@ -5,7 +5,7 @@
 #include <Wire.h>
 
 #include "Configuration.h"
-#include "PinDefinitions.h"
+#include "pinDefinitions.h"
 
 void setIlluminationBaseline();
 bool getIllumination();
