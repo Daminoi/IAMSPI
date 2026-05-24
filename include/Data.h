@@ -6,8 +6,14 @@ struct sensorMeasure {
     float rh;
 };
 
+struct PredictionResult {
+        float slope;
+        float intercept;
+        float nextValue;
+};
 
 #define WINDOW_SIZE 12
-RTC_DATA_ATTR struct sensorMeasure measurements[WINDOW_SIZE];
-RTC_DATA_ATTR uint8_t nCurrStoredMeasures = 0;
-RTC_DATA_ATTR uint8_t measurementIndex = 0;
+
+extern RTC_DATA_ATTR struct sensorMeasure measurements[WINDOW_SIZE];
+extern RTC_DATA_ATTR uint8_t nCurrStoredMeasures;
+extern RTC_DATA_ATTR uint8_t measurementIndex;

@@ -1,35 +1,30 @@
+#include "Data.h"
 #include "LoRa.h"
 #include <heltec_unofficial.h>
 #include <LoRaWAN_ESP32.h>
 
 // Global pointer for the RadioLib LoRaWAN node stack
 LoRaWANNode* node;
+bool LoRaManager::IsReadyForTransmission = false;
 
 void loRaSleepCallback(RadioLibTime_t ms);
 
 void LoRaManager::begin(uint8_t* appEui, uint8_t* devEui, uint8_t* appKey) {
-    Serial.begin(115200);
-	while(!Serial)			// Wait for the serial connection to complete, if the status LED remains RED we can immediately tell something is wrong with the serial
-		vTaskDelay(200 / portTICK_PERIOD_MS);
-    Serial.flush();
-
     // 1. Initialize the Heltec v3 hardware radio
-    Serial.println("[LoRa] Initializing Heltec LoRa hardware...");
     heltec_setup();
     int16_t state = radio.begin();
     if (state != RADIOLIB_ERR_NONE) {
         Serial.printf("[LoRa] Hardware initialization failed! Code: %d\n", state);
         return;
     }
-    Serial.println("[LoRa] Hardware Initialised...");
 
     // 2. Clone keys into a dynamic memory structure for the FreeRTOS thread
     LoRaKeys* savedKeys = new LoRaKeys();
     memcpy(savedKeys->joinEui, appEui, 8);
     memcpy(savedKeys->devEui, devEui, 8);
     memcpy(savedKeys->appKey, appKey, 16);
-
-    Serial.println("[LoRa] Initializing Task...");
+    
+    LoRaManager::IsReadyForTransmission = false;
 
     // 3. Spawn the independent background FreeRTOS worker task
     xTaskCreatePinnedToCore(
@@ -49,7 +44,6 @@ void LoRaManager::loraTaskWorker(void *pvParameters) {
     int counter = 0;
 
     node = persist.manage(&radio);
-
     node->setSleepFunction(loRaSleepCallback);
 
     Serial.println("[LoRa] Node State: " + String(node->isActivated()));
@@ -83,29 +77,50 @@ void LoRaManager::loraTaskWorker(void *pvParameters) {
     delete keys;
 
     // --- The Main Continuous LoRa Transmission Loop ---
+    if (!IsReadyForTransmission) return;
     while (true) {
-        uint8_t payload[2];
-        payload[0] = highByte(counter);
-        payload[1] = lowByte(counter);
+        for (int i = 0; i < WINDOW_SIZE; i++) {
+            uint16_t actualCO2   = measurements[i].co2;         // e.g., 850 ppm
+            float actualTemp     = measurements[i].temp;        // e.g., 23.54 °C
+            float actualRH       = measurements[i].rh;          // e.g., 45.21 %
+            float predictedCO2   = 912.40f;                     // e.g., 912.40 ppm
 
-        Serial.printf("[LoRa Task] Uploading frame data #%d...\n", counter);
-        
-        // RadioLib update: sendReceive handles uplink transmissions, 
-        // choosing Port 1, and expects a temporary output string placeholder for downlinks.
-        String strDownlinkResponse = "";
-        int16_t state = node->sendReceive(payload, sizeof(payload), 1, strDownlinkResponse);
+            // 2. Compress the floats into 16-bit integers by saving the decimals
+            // Multiplying temperature by 100 turns 23.54 into 2354 (fits perfectly in 2 bytes)
+            int16_t encodedTemp = (int16_t)(actualTemp * 100.0f); 
+            uint16_t encodedRH  = (uint16_t)(actualRH * 100.0f);  // 45.21 -> 4521
+            uint16_t encodedPred= (uint16_t)predictedCO2;         // 912.40 -> 912 (CO2 decimals aren't critical)
 
-        if (state == RADIOLIB_ERR_NONE) {
-            Serial.println("[LoRa Task] Uplink broadcast complete!");
+            // 3. Allocate an 8-byte payload array (2 bytes per metric x 4 metrics)
+            uint8_t payload[8];
+
+            // Bytes 0-1: Actual CO2
+            payload[0] = (actualCO2 >> 8) & 0xFF;
+            payload[1] = actualCO2 & 0xFF;
+
+            // Bytes 2-3: Predicted CO2
+            payload[2] = (encodedPred >> 8) & 0xFF;
+            payload[3] = encodedPred & 0xFF;
+
+            // Bytes 4-5: Temperature
+            payload[4] = (encodedTemp >> 8) & 0xFF;
+            payload[5] = encodedTemp & 0xFF;
+
+            // Bytes 6-7: Humidity
+            payload[6] = (encodedRH >> 8) & 0xFF;
+            payload[7] = encodedRH & 0xFF;
             
-            // Visual feedback update for the onboard OLED display screen
-            heltec_display_power(true);
-            display.clear();
-            display.drawString(0, 0, "LoRa Task Active");
-            display.drawString(0, 15, "Uplink Frame: " + String(counter));
-            display.display();
-        } else {
-            Serial.printf("[LoRa Task] Transmission skipped/dropped. Error: %d\n", state);
+            Serial.printf("[LoRa Task] Uploading frame data #%d...\n", counter);
+        
+            // RadioLib update: sendReceive handles uplink transmissions, 
+            // choosing Port 1, and expects a temporary output string placeholder for downlinks.
+            String strDownlinkResponse = "";
+            int16_t state = node->sendReceive(payload, sizeof(payload), 1, strDownlinkResponse);
+
+            if (state == RADIOLIB_ERR_NONE)
+                Serial.println("[LoRa Task] Uplink broadcast complete!");
+            else
+                Serial.printf("[LoRa Task] Transmission skipped/dropped. Error: %d\n", state);
         }
 
         counter++;

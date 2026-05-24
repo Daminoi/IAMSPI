@@ -4,17 +4,22 @@
 #include "Prediction.h"
 #include "LoRa.h"
 
-// --- Persistent Memory (RTC RAM) ---
-RTC_DATA_ATTR uint8_t is_first_boot = 1;
-RTC_DATA_ATTR uint8_t pre_alert = 0;
-RTC_DATA_ATTR uint8_t light_On = 0;
-
-
 #ifdef SCD41_NO_ERROR
 	#undef SCD41_NO_ERROR
 #endif
 #define SCD41_NO_ERROR 0
 
+// --- Persistent Memory (RTC RAM) ---
+RTC_DATA_ATTR uint8_t is_first_boot = 1;
+RTC_DATA_ATTR uint8_t pre_alert = 0;
+RTC_DATA_ATTR uint8_t light_On = 0;
+
+RTC_DATA_ATTR struct sensorMeasure measurements[WINDOW_SIZE];
+RTC_DATA_ATTR uint8_t nCurrStoredMeasures;
+RTC_DATA_ATTR uint8_t measurementIndex;
+
+// Allocate the Mutex handle space
+SemaphoreHandle_t dataMutex = NULL;
 
 // Global Sensor Object
 SensirionI2cScd4x scd41;
@@ -74,6 +79,10 @@ void setup() {
     else scd41.wakeUp(); // TODO: is this required?
 
     setLEDStatusGREEN(); 	// The green status LED will stay on while the board is in light sleep, only for debugging purposes
+
+    dataMutex = xSemaphoreCreateMutex();
+
+    if (dataMutex == NULL) Serial.println("Failed to create Data Mutex.");
 
     // 2. Start the main logic sequence as a Task
     xTaskCreate(
@@ -136,12 +145,12 @@ void runSystemSequence() {
                 measurements[nCurrStoredMeasures++] = currentData;
             else if (nCurrStoredMeasures >= 12) {
                 Serial.println("Triggering LoRa Uplink...");
-                // triggerLoRaSend(); 
+                LoRaManager::IsReadyForTransmission = true;
                 nCurrStoredMeasures = 0;
                 measurements[nCurrStoredMeasures++] = currentData;
             } else if (pre_alert == 1) {
                 Serial.println("Triggering LoRa Uplink...");
-                // triggerLoRaSend(); 
+                //LoRaManager::IsReadyForTransmission = true;
                 pre_alert = 0;
             }
             break;
