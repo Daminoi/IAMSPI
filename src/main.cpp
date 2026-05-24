@@ -2,6 +2,7 @@
 #include "humanInteraction.h"
 #include "LightsOn.h"
 #include "Prediction.h"
+#include "LoRa.h"
 
 // --- Persistent Memory (RTC RAM) ---
 RTC_DATA_ATTR uint8_t is_first_boot = 1;
@@ -24,6 +25,13 @@ int lastPrinted = 0;
 const float cO2Alpha = 0.15;
 uint8_t isFirstReading = 1;
 
+uint8_t joinEui[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+// devEUI: 70B3D57ED0077AD5
+uint8_t devEui[] = { 0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x07, 0x7A, 0xD5 };
+
+// appKey: 46907A312CE3EB2A8FD83E97795287EA
+uint8_t appKey[] = { 0x46, 0x90, 0x7A, 0x31, 0x2C, 0xE3, 0xEB, 0x2A, 0x8F, 0xD8, 0x3E, 0x97, 0x79, 0x52, 0x87, 0xEA };
 
 // --- Function Declarations ---
 void runSystemSequence();
@@ -35,11 +43,10 @@ void wakeSCDAfterDeepSleep();
 void setup() {
     Serial.begin(115200);
 	setLEDStatusRED();
-	while(!Serial)			// Wait for the serial connection to complete, if the status LED remains RED we can immediately tell something is wrong with the serial
-		vTaskDelay(200 / portTICK_PERIOD_MS);
-	setLEDStatusOFF();
+    delay(3000);
+    setLEDStatusOFF();
     Serial.flush();
-    
+
     // 1. Initialize Hardware
     pinMode(VE_ENABLE, OUTPUT);
     digitalWrite(VE_ENABLE, LOW); // Power sensor
@@ -87,6 +94,8 @@ void setup() {
         NULL,               // Task Handle tracking reference
         1                   // Pin execution specifically to App Core 1
         );
+
+    LoRaManager::begin(joinEui, devEui, appKey);
 }
 
 void loop() {
@@ -115,7 +124,9 @@ void runSystemSequence() {
             filteredCO2 = currentData.co2;
         }
         else 
-        currentData.co2 = (cO2Alpha * currentData.co2) + ((1.0f - cO2Alpha) * filteredCO2);
+            // LPF for smoothing CO2 values
+            // temp and humidity are quiet smooth already. 
+            currentData.co2 = (cO2Alpha * currentData.co2) + ((1.0f - cO2Alpha) * filteredCO2);
         if (currentData.co2 && currentData.temp && currentData.rh) {
             // Phase 2: Logic & UI
             handleLogic(currentData);
