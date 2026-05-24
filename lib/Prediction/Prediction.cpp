@@ -2,14 +2,11 @@
 
 // --- Configuration ---
 #define SLOPE_THRESHOLD 5.0 // Threshold to take action if air quality degrades too quickly
+int N = nCurrStoredMeasures;
 
-// --- C++ Linear Regression Class ---
-// public:
 // Calculates the OLS regression
-static PredictionResult calculateRegression(float nextX)
-{
+static PredictionResult calculateRegression(float nextX) {
     float sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-    int N = nCurrStoredMeasures;
 
     for (int i = 0; i < N; i++)
     {
@@ -34,8 +31,7 @@ static PredictionResult calculateRegression(float nextX)
 }
 
 // --- FreeRTOS Task ---
-void processingTask(sensorMeasure *measures)
-{
+void processingTask(sensorMeasure *measures) {
     PredictionResult trend = calculateRegression((float)WINDOW_SIZE);
 
     Serial.printf("Current: %.2f | Calculated Slope: %.4f | Predicted Next: %.2f\n",
@@ -43,15 +39,14 @@ void processingTask(sensorMeasure *measures)
     Serial.printf(">pred_co2:%d:%u|\n", measurementIndex++, trend.nextValue);
 
     // Act based on the trend evaluation
-    if (nCurrStoredMeasures >= WINDOW_SIZE && trend.slope > SLOPE_THRESHOLD)
-    {
+    if (nCurrStoredMeasures >= WINDOW_SIZE && trend.slope > SLOPE_THRESHOLD) {
         Serial.println("WARNING: Air quality degrading rapidly! Activating air filter...");
         // digitalWrite(GPIO_NUM_2, HIGH); // Turn on peripheral actuator (fan, alert LED, etc.)
         delay(1000); // Allow physical hardware action visibility before dropping power
     }
 
     // Teleplot Logging (Real vs Predicted)
-    String currentPacket = "Air_Real:" + String(nCurrStoredMeasures) + ":" + String(measurements[nCurrStoredMeasures - 1].co2) + "|xy\n";
+    String currentPacket = "Air_Real:" + String(N) + ":" + String(measurements[N - 1].co2) + "|xy\n";
     String predictPacket = "Air_Trend:" + String(WINDOW_SIZE - 1) + ":" + String(trend.nextValue) + "|xy\n";
 
     vTaskDelete(NULL); // Fallback safety catch
