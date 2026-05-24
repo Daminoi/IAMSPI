@@ -3,7 +3,15 @@
 
 #include "Data.h"
 
-static PredictionResult calculateRegression(float nextX);
-void processingTask(sensorMeasure *measures);
+
+
+class Regression {
+public:
+    static PredictionResult calculateRegression(float nextX);
+    static void processingTask(sensorMeasure *measures);
+
+private:
+    static uint16_t readLDR ();
+};
 
 #endif /* PREDICTION_H */

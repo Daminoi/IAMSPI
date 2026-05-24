@@ -13,22 +13,19 @@
 RTC_DATA_ATTR uint8_t is_first_boot = 1;
 RTC_DATA_ATTR uint8_t pre_alert = 0;
 RTC_DATA_ATTR uint8_t light_On = 0;
+RTC_DATA_ATTR uint8_t isFirstReading = 1;
 
 RTC_DATA_ATTR struct sensorMeasure measurements[WINDOW_SIZE];
 RTC_DATA_ATTR uint8_t nCurrStoredMeasures;
 RTC_DATA_ATTR uint8_t measurementIndex;
 
-// Allocate the Mutex handle space
-SemaphoreHandle_t dataMutex = NULL;
-
-// Global Sensor Object
-SensirionI2cScd4x scd41;
+SensirionI2cScd4x scd41;    // Global Sensor Object
 int16_t scd41Error;
 char errorMessage[64];
 int lastPrinted = 0;
-
 const float cO2Alpha = 0.15;
-uint8_t isFirstReading = 1;
+
+SemaphoreHandle_t dataMutex = NULL;
 
 uint8_t joinEui[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
@@ -40,7 +37,7 @@ uint8_t appKey[] = { 0x46, 0x90, 0x7A, 0x31, 0x2C, 0xE3, 0xEB, 0x2A, 0x8F, 0xD8,
 
 // --- Function Declarations ---
 void runSystemSequence();
-void handleLogic(sensorMeasure data);
+void checkLevels(sensorMeasure data);
 void goToDeepSleep();
 int getSCD41Reading (sensorMeasure &data);
 void wakeSCDAfterDeepSleep();
@@ -63,9 +60,9 @@ void setup() {
 
     if (is_first_boot) {
         Serial.println("Initial Boot: Performing Self-Check...");
-        setIlluminationBaseline();
+        LDR::setIlluminationBaseline();
         // Add startup_welcome() here
-        light_On = getIllumination ();
+        light_On = LDR::getIllumination();
         
         if (!light_On) {
             // If we woke up and the light is still off, it means we are in a low-light environment and we should skip the sensor reading and go back to sleep immediately.
@@ -94,16 +91,18 @@ void setup() {
         NULL
     );
 
+    // Prediction Task
     xTaskCreatePinnedToCore(
-        [](void * o) { processingTask (measurements); },     // Task function
-        "ProcTask",         // Task name tag
-        4096,               // Stack size
-        NULL,               // Parameters
-        3,                  // Priority execution rank
-        NULL,               // Task Handle tracking reference
-        1                   // Pin execution specifically to App Core 1
-        );
+        [](void * o) { Regression::processingTask(measurements); },
+        "ProcTask", 
+        4096,
+        NULL,
+        3,
+        NULL,
+        1
+    );
 
+    // Communication task
     LoRaManager::begin(joinEui, devEui, appKey);
 }
 
@@ -115,7 +114,7 @@ void loop() {
 void runSystemSequence() {
     sensorMeasure currentData;
     
-    light_On = getIllumination ();
+    light_On = LDR::getIllumination();
     if (!light_On) {
         // If we woke up and the light is still off, it means we are in a low-light environment and we should skip the sensor reading and go back to sleep immediately.
         Serial.println("Low light detected on wakeup, going back to sleep...");
@@ -132,13 +131,15 @@ void runSystemSequence() {
             isFirstReading = 0;
             filteredCO2 = currentData.co2;
         }
-        else 
+        else {
             // LPF for smoothing CO2 values
             // temp and humidity are quiet smooth already. 
             currentData.co2 = (cO2Alpha * currentData.co2) + ((1.0f - cO2Alpha) * filteredCO2);
+        }
+        
         if (currentData.co2 && currentData.temp && currentData.rh) {
             // Phase 2: Logic & UI
-            handleLogic(currentData);
+            checkLevels(currentData);
 
             // Phase 3: Data Storage and Transmission (If buffer full or Alert)
             if (nCurrStoredMeasures < 12)
@@ -196,20 +197,14 @@ int getSCD41Reading (sensorMeasure &data) {
     return SCD41_NO_ERROR;
 }
 
-void handleLogic(sensorMeasure data) {
-    measurements[nCurrStoredMeasures].co2 	= data.co2;
-	measurements[nCurrStoredMeasures].temp 	= data.temp;
-	measurements[nCurrStoredMeasures].rh 	= data.rh;
-	nCurrStoredMeasures++;
+void checkLevels(sensorMeasure data) {
     if (data.co2 - CO2_VERY_HIGH >= CO2_ERROR) {
         pre_alert = 1;
         setAqiRED();
-        // Use a non-blocking chime or a separate task for buzzer
-    } else if (data.co2 - CO2_MEDIUM >= CO2_ERROR || data.temp - TEMP_HIGH >= TEMP_ERROR || data.rh - RH_HIGH >= RH_ERROR) {
-        setAqiYELLOW();
-    } else {
-        setAqiGREEN();
-    }
+    } else if (data.co2 - CO2_MEDIUM >= CO2_ERROR || 
+               data.temp - TEMP_HIGH >= TEMP_ERROR ||
+               data.rh - RH_HIGH >= RH_ERROR) setAqiYELLOW();
+    else setAqiGREEN();
     
     // Hold LED for user to see
     vTaskDelay(pdMS_TO_TICKS(2000));

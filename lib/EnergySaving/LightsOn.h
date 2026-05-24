@@ -7,8 +7,14 @@
 #include "Configuration.h"
 #include "pinDefinitions.h"
 
-void setIlluminationBaseline();
-bool getIllumination();
-uint16_t readLDR ();
+class LDR {
+public:
+    // Initializes the Baseline which acts as the value for "Darkness".
+    static void setIlluminationBaseline();
+    static bool getIllumination();
+
+private:
+    static uint16_t readLDR ();
+};
 
 #endif /* LIGHTSON_H */

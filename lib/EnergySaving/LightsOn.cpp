@@ -14,16 +14,14 @@ const int lightOffThresholdDelta = 50; // lower threshold for hysteresis
 RTC_DATA_ATTR uint16_t lightInit = 0; // initial baseline reading
 RTC_DATA_ATTR float lightFiltered = 0; // initial baseline reading
 
-// float lightFiltered = 0;    // smoothed sensor value
 bool lightsOn = false;      // current interpreted state
 unsigned long lastSampleMs = 0;
 
 // Gets Initial Baseline for photoresistor readings as an avg over 3 500ms intervals.
-void setIlluminationBaseline() {
+void LDR::setIlluminationBaseline() {
   uint16_t sum = 0;
   for (int i = 0; i < 3; i++) {
-    uint16_t rawValue = readLDR();
-    sum += (alpha * rawValue + (1.0f - alpha) * lightFiltered);
+    sum += readLDR();
     delay(500);
   }
   lightInit = sum / 3;
@@ -33,7 +31,7 @@ void setIlluminationBaseline() {
   Serial.println(lightInit);
 }
 
-bool getIllumination() {
+bool LDR::getIllumination() {
   uint16_t rawValue = readLDR();
 
   // Apply exponential smoothing to reduce jitter.
@@ -47,7 +45,7 @@ bool getIllumination() {
   return lightsOn;
 }
 
-uint16_t readLDR () {
+uint16_t LDR::readLDR () {
   digitalWrite(LDR_POWER, HIGH); // Power the LDR circuit
   delay(100); // Short delay to allow the sensor to stabilize after powering it on
   uint16_t rawValue = analogRead(LDR_INPUT);

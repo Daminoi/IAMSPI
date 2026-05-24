@@ -5,7 +5,7 @@
 int N = nCurrStoredMeasures;
 
 // Calculates the OLS regression
-static PredictionResult calculateRegression(float nextX) {
+PredictionResult Regression::calculateRegression(float nextX) {
     float sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
 
     for (int i = 0; i < N; i++)
@@ -31,7 +31,7 @@ static PredictionResult calculateRegression(float nextX) {
 }
 
 // --- FreeRTOS Task ---
-void processingTask(sensorMeasure *measures) {
+void Regression::processingTask(sensorMeasure *measures) {
     PredictionResult trend = calculateRegression((float)WINDOW_SIZE);
 
     Serial.printf("Current: %.2f | Calculated Slope: %.4f | Predicted Next: %.2f\n",
