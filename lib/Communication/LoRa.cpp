@@ -88,9 +88,9 @@ void LoRaManager::loraTaskWorker(void *pvParameters) {
             float actualRH       = measurementsCpy[i].rh;          
             float predictedCO2   = 912.40f;                      
 
-            int16_t encodedTemp = (int16_t)(actualTemp * 100.0f); 
-            uint16_t encodedRH  = (uint16_t)(actualRH * 100.0f);  
-            uint16_t encodedPred= (uint16_t)predictedCO2;         
+            int16_t encodedTemp = (int16_t)(actualTemp * 100.0f);
+            uint16_t encodedRH  = (uint16_t)(actualRH * 100.0f);
+            uint16_t encodedPred= (uint16_t)predictedCO2;
 
             uint8_t payload[8];
             payload[0] = (actualCO2 >> 8) & 0xFF;
