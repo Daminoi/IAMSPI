@@ -26,6 +26,7 @@ int lastPrinted = 0;
 const float cO2Alpha = 0.15;
 
 SemaphoreHandle_t dataMutex = NULL;
+TaskHandle_t loRaTaskHandle = NULL;
 
 uint8_t joinEui[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
@@ -62,14 +63,14 @@ void setup() {
         Serial.println("Initial Boot: Performing Self-Check...");
         LDR::setIlluminationBaseline();
         // Add startup_welcome() here
-        light_On = LDR::getIllumination();
+        // light_On = LDR::getIllumination(); // TODO: is this required?
         
-        if (!light_On) {
-            // If we woke up and the light is still off, it means we are in a low-light environment and we should skip the sensor reading and go back to sleep immediately.
-            Serial.println("Low light detected on wakeup, going back to sleep...");
-            goToDeepSleep();
-            return;
-        }
+        // if (!light_On) {
+        //     // If we woke up and the light is still off, it means we are in a low-light environment and we should skip the sensor reading and go back to sleep immediately.
+        //     Serial.println("Low light detected on wakeup, going back to sleep...");
+        //     goToDeepSleep();
+        //     return;
+        // }
         wakeSCDAfterDeepSleep ();
         is_first_boot = 0;
     }
@@ -81,6 +82,9 @@ void setup() {
 
     if (dataMutex == NULL) Serial.println("Failed to create Data Mutex.");
 
+    // Communication task
+    LoRaManager::begin(joinEui, devEui, appKey);
+
     // 2. Start the main logic sequence as a Task
     xTaskCreate(
         [](void * o) { runSystemSequence(); },
@@ -88,7 +92,7 @@ void setup() {
         4096,
         NULL,
         1,
-        NULL
+        &loRaTaskHandle
     );
 
     // Prediction Task
@@ -101,9 +105,6 @@ void setup() {
         NULL,
         1
     );
-
-    // Communication task
-    LoRaManager::begin(joinEui, devEui, appKey);
 }
 
 void loop() {
@@ -140,12 +141,16 @@ void runSystemSequence() {
         if (currentData.co2 && currentData.temp && currentData.rh) {
             // Phase 2: Logic & UI
             checkLevels(currentData);
-
             // Phase 3: Data Storage and Transmission (If buffer full or Alert)
-            if (nCurrStoredMeasures < 12)
+            if (nCurrStoredMeasures < WINDOW_SIZE) {
                 measurements[nCurrStoredMeasures++] = currentData;
-            else if (nCurrStoredMeasures >= 12) {
+                Serial.println("Data stored successfully.");
+            }
+            else if (nCurrStoredMeasures >= WINDOW_SIZE) {
                 Serial.println("Triggering LoRa Uplink...");
+                for (int i = 0; i < WINDOW_SIZE; i++) {
+                    LoRaManager::measurementsCpy[i] = measurements[i];
+                }
                 LoRaManager::IsReadyForTransmission = true;
                 nCurrStoredMeasures = 0;
                 measurements[nCurrStoredMeasures++] = currentData;
@@ -159,7 +164,9 @@ void runSystemSequence() {
         Serial.println("Reading failed, retrying...");
     }
     
+    while (!loRaTaskHandle || LoRaManager::IsReadyForTransmission) vTaskDelay(pdMS_TO_TICKS(500));
     // Phase 5: Shutdown
+    Serial.println("Sequence complete, going to sleep...");
     goToDeepSleep();
 }
 

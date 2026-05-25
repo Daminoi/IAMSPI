@@ -6,25 +6,26 @@ int N = nCurrStoredMeasures;
 
 // Calculates the OLS regression
 PredictionResult Regression::calculateRegression(float nextX) {
-    float sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    int N = nCurrStoredMeasures;
+    PredictionResult res = {0.0f, 0.0f, 0.0f};
+    if (N < 2) return res;
 
-    for (int i = 0; i < N; i++)
-    {
-        sumX += measurements[i].co2;
-        sumY += measurementIndex;
-        sumXY += measurements[i].co2 * measurementIndex;
-        sumXX += measurements[i].co2 * measurements[i].co2;
+    float sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    for (int i = 0; i < N; i++) {
+        // X = sample index, Y = actual CO2 data point
+        float currentX = (float)i; 
+        float currentY = (float)measurements[i].co2;
+
+        sumX  += currentX;
+        sumY  += currentY;
+        sumXY += currentX * currentY;
+        sumXX += currentX * currentX;
     }
 
-    PredictionResult res = {0.0f, 0.0f, 0.0f};
-    if (N < 2)
-        return res; // Need at least two points to calculate a trend line
-
     float denominator = (N * sumXX) - (sumX * sumX);
-    if (denominator != 0)
-    {
+    if (denominator != 0) {
         res.slope = ((N * sumXY) - (sumX * sumY)) / denominator;
-        res.intercept = (sumY - (res.slope * sumX)) / N;
+        res.intercept = (sumY - (res.slope * sumX)) / N;        
         res.nextValue = (res.slope * nextX) + res.intercept;
     }
     return res;
@@ -36,7 +37,7 @@ void Regression::processingTask(sensorMeasure *measures) {
 
     Serial.printf("Current: %.2f | Calculated Slope: %.4f | Predicted Next: %.2f\n",
                   measurements[WINDOW_SIZE - 1].co2, trend.slope, trend.nextValue);
-    Serial.printf(">pred_co2:%d:%u|\n", measurementIndex++, trend.nextValue);
+    Serial.printf(">pred_co2:%d:%.2f|\n", measurementIndex, trend.nextValue);
 
     // Act based on the trend evaluation
     if (nCurrStoredMeasures >= WINDOW_SIZE && trend.slope > SLOPE_THRESHOLD) {

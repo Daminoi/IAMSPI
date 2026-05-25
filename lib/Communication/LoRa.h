@@ -8,6 +8,7 @@ public:
     // Initializes the radio and kicks off the background FreeRTOS task
     static void begin(uint8_t* appEui, uint8_t* devEui, uint8_t* appKey);
     static bool IsReadyForTransmission;
+    static RTC_DATA_ATTR struct sensorMeasure measurementsCpy[WINDOW_SIZE];
 
 private:
     // The core FreeRTOS background task function

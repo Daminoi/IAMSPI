@@ -3,8 +3,6 @@
 
 #include "Data.h"
 
-
-
 class Regression {
 public:
     static PredictionResult calculateRegression(float nextX);
