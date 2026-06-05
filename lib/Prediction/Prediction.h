@@ -3,12 +3,10 @@
 
 #include "Data.h"
 
-
-
 class Regression {
 public:
     static PredictionResult calculateRegression(float nextX);
-    static void processingTask(sensorMeasure *measures);
+    static void processingTask();
 
 private:
     static uint16_t readLDR ();
