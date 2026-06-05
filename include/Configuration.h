@@ -17,4 +17,9 @@ const float RH_HIGH          = 60;
 const float RH_LOW           = 40;
 const float RH_ERROR         = 5;
 
+// DEBUGGING DEFS
+
+// comment the following line to disable all features that are ONLY meant for debugging purposes
+#define DEBUG_MODE_ACTIVE 1
+
 #endif /* CONFIGURATION_H */

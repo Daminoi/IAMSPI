@@ -17,11 +17,11 @@
 #define RED_LED		45
 
 // GPIO pin dedicated to the red   led of the multicolor led that indicates the system's status
-#define STATUS_RLED 3
+#define STATUS_RLED 03
 // GPIO pin dedicated to the green led of the multicolor led that indicates the system's status
-#define STATUS_GLED 4
+#define STATUS_GLED 04
 // GPIO pin dedicated to the blue  led of the multicolor led that indicates the system's status
-#define STATUS_BLED 5
+#define STATUS_BLED 05
 
 #define BUZZERINO	46
 
@@ -33,6 +33,10 @@
 #define LDR_POWER   06
 
 #define LDR_INPUT   07
+
+#define BTN_PWR     40
+
+#define BTN_SENSE   02
 
 #define VE_ENABLE   36
 

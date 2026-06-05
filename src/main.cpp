@@ -9,7 +9,7 @@
 #endif
 #define SCD41_NO_ERROR 0
 
-// --- Persistent Memory (RTC RAM) ---
+// Persistent Memory
 RTC_DATA_ATTR uint8_t is_first_boot = 1;
 RTC_DATA_ATTR uint8_t pre_alert = 0;
 RTC_DATA_ATTR uint8_t light_On = 0;
@@ -35,7 +35,7 @@ uint8_t devEui[] = { 0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x07, 0x7A, 0xD5 };
 // appKey: 46907A312CE3EB2A8FD83E97795287EA
 uint8_t appKey[] = { 0x46, 0x90, 0x7A, 0x31, 0x2C, 0xE3, 0xEB, 0x2A, 0x8F, 0xD8, 0x3E, 0x97, 0x79, 0x52, 0x87, 0xEA };
 
-// --- Function Declarations ---
+
 void runSystemSequence();
 void checkLevels(sensorMeasure data);
 void goToDeepSleep();
@@ -43,22 +43,34 @@ int getSCD41Reading (sensorMeasure &data);
 void wakeSCDAfterDeepSleep();
 
 void setup() {
-    Serial.begin(115200);
-	setLEDStatusRED();
-    delay(3000);
-    setLEDStatusOFF();
-    Serial.flush();
-
+    
     // 1. Initialize Hardware
     pinMode(VE_ENABLE, OUTPUT);
     digitalWrite(VE_ENABLE, LOW); // Power sensor
+    
     pinMode(LDR_POWER, OUTPUT); // power LDR
     digitalWrite(LDR_INPUT, LOW); // low by default
+    
+    initBuzzerGPIO();
+    initLEDsGPIO();
+    initButtonGPIO();
 
+    #ifdef DEBUG_MODE_ACTIVE
+    if(is_first_boot == 1)
+        startupSelfTestLedBuzzer();
+    #endif
+    
+    // Serial initialization
+    Serial.begin(115200);
+	setLEDStatusRED();
+    delay(1000);
+    setLEDStatusOFF();
+    Serial.flush();
+    
     Wire.begin(SDA_GPIO, SCL_GPIO);
     scd41.begin(Wire, SCD41_I2C_ADDR_62);
 
-    if (is_first_boot) {
+    if (is_first_boot == 1) {
         Serial.println("Initial Boot: Performing Self-Check...");
         LDR::setIlluminationBaseline();
         // Add startup_welcome() here

@@ -4,11 +4,14 @@
 #include <Arduino.h>
 #include "pinDefinitions.h"
 
+void initBuzzerGPIO();
+void initLEDsGPIO();
+void initButtonGPIO();
 
 void playStartUpChime();
 void playPreAlertChime();
 
-void startup_welcome();
+void startupSelfTestLedBuzzer();
 
 void setLEDStatusRED();
 void setLEDStatusGREEN();
@@ -22,5 +25,10 @@ void setAqiYELLOW();
 void setAqiGREEN();
 void setAqiOFF();
 
+void activateButtonSensing();
+void disableButtonSensing();
+uint8_t checkButtonClickState();
+uint8_t checkButtonLongPress(uint16_t millisBtwChecks, uint16_t nChecks);
+uint8_t checkButtonAtLeastOnePress(uint16_t millisBtwChecks, uint16_t nChecks);
 
 #endif /* HUMANINTERACTION_H */
