@@ -25,8 +25,8 @@ void setAqiYELLOW();
 void setAqiGREEN();
 void setAqiOFF();
 
-void activateButtonSensing();
-void disableButtonSensing();
+void activateButtonPower();
+void disableButtonPower();
 uint8_t checkButtonClickState();
 uint8_t checkButtonLongPress(uint16_t millisBtwChecks, uint16_t nChecks);
 uint8_t checkButtonAtLeastOnePress(uint16_t millisBtwChecks, uint16_t nChecks);

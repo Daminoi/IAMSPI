@@ -6,7 +6,7 @@
 class Regression {
 public:
     static PredictionResult calculateRegression(float nextX);
-    static void processingTask();
+    static void processingTask(uint8_t msrmntIndex);
 
 private:
     static uint16_t readLDR ();

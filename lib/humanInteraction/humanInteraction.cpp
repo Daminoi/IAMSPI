@@ -17,6 +17,7 @@ void initLEDsGPIO()
 
 void initButtonGPIO()
 {
+	pinMode(BTN_PWR,		OUTPUT);
 	pinMode(BTN_SENSE,		INPUT);
 }
 
@@ -210,13 +211,13 @@ void unrecoverableErrorStatus()
 	}
 }
 
-void activateButtonSensing()
+void activateButtonPower()
 {
 	digitalWrite(BTN_PWR, HIGH);
 }
 
 // The button doesn't let current flow when it is not pressed. It is still good to disable it when not in use.
-void disableButtonSensing()
+void disableButtonPower()
 {
 	digitalWrite(BTN_PWR, LOW);
 }
@@ -234,7 +235,7 @@ uint8_t checkButtonClickState()
 }
 
 // returns 1 if and only if the button state is "pressed" for nChecks consecutive times, each executed with millisBtwChecks interval.
-// returns 0 otherwise.
+// returns 0 otherwise (as soon as a button state check returns 0).
 // This will halt the current thread calling this function until the probing is over.
 uint8_t checkButtonLongPress(uint16_t millisBtwChecks, uint16_t nChecks)
 {
@@ -249,6 +250,7 @@ uint8_t checkButtonLongPress(uint16_t millisBtwChecks, uint16_t nChecks)
 }
 
 // returns 1 if and only if the button state is "pressed" at least once in nChecks consecutive probes, each executed with millisBtwChecks interval.
+// The value 1 is returned as soon as one click is detected.
 // returns 0 otherwise.
 // This will halt the current thread calling this function until the probing is over.
 uint8_t checkButtonAtLeastOnePress(uint16_t millisBtwChecks, uint16_t nChecks)

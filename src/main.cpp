@@ -1,15 +1,15 @@
-#include <Globals.h>
+#include <SSD1306Wire.h>
+
+#include "Globals.h"
 #include "humanInteraction.h"
 #include "LightsOn.h"
 #include "Prediction.h"
 #include "LoRa.h"
+#include "Data.h"
 
-#ifdef SCD41_NO_ERROR
-	#undef SCD41_NO_ERROR
-#endif
 #define SCD41_NO_ERROR 0
 
-// Persistent Memory
+// Persistent Memory (persists after Deep Sleep but not after a full power down-power up cicle)
 RTC_DATA_ATTR uint8_t is_first_boot = 1;
 RTC_DATA_ATTR uint8_t pre_alert = 0;
 RTC_DATA_ATTR uint8_t light_On = 0;
@@ -44,21 +44,40 @@ int getSCD41Reading (sensorMeasure &data);
 void wakeSCDAfterDeepSleep();
 
 void setup() {
-    
+
     // 1. Initialize Hardware
     pinMode(VE_ENABLE, OUTPUT);
-    digitalWrite(VE_ENABLE, LOW); // Power sensor
+    digitalWrite(VE_ENABLE, LOW);
     
-    pinMode(LDR_POWER, OUTPUT); // power LDR
+    Wire1.begin(SDA_GPIO, SCL_GPIO);
+    
+    SSD1306Wire display(0x3C, OLED_SDA, OLED_SCL, GEOMETRY_128_64, I2C_ONE);
+    pinMode(OLED_RST, OUTPUT);
+
+    digitalWrite(OLED_RST, LOW);
+    delay(50);
+    digitalWrite(OLED_RST, HIGH);
+    delay(50);
+
+    display.init();
+    display.displayOn();
+    display.flipScreenVertically();
+    display.setContrast(255);
+
+    //display.setFont("ArialMT_Plain_24");
+    display.println("IAMSPI v1.0");
+    
+    
+    pinMode(LDR_POWER, OUTPUT);
     digitalWrite(LDR_INPUT, LOW); // low by default
     
     initBuzzerGPIO();
     initLEDsGPIO();
     initButtonGPIO();
-
+    
     #ifdef DEBUG_MODE_ACTIVE
     if(is_first_boot == 1)
-        startupSelfTestLedBuzzer();
+    startupSelfTestLedBuzzer();
     #endif
     
     // Serial initialization
@@ -67,31 +86,40 @@ void setup() {
     delay(1000);
     setLEDStatusOFF();
     Serial.flush();
-    
-    Wire.begin(SDA_GPIO, SCL_GPIO);
-    scd41.begin(Wire, SCD41_I2C_ADDR_62);
 
     if (is_first_boot == 1) {
-        Serial.println("Initial Boot: Performing Self-Check...");
+        Serial.println("Booting up after full power cicle: performing light sensor calibration...");
+
+
+        display.cls();
+        //display.setFont("ArialMT_Plain_16");
+        display.println("LDR calibration:\n keep the LDR covered\n while pressing the button");
+
+        activateButtonPower();
+        while(checkButtonAtLeastOnePress(250, 100) == 0)
+        {
+            Serial.println("Keep the LDR covered while clicking the button to perform the calibration ...");
+            playStartUpChime(); // so that we don't forget to do this calibration step
+        }
+        disableButtonPower();
+
         LDR::setIlluminationBaseline();
-        // Add startup_welcome() here
-        // light_On = LDR::getIllumination(); // TODO: is this required?
+
         
-        // if (!light_On) {
-        //     // If we woke up and the light is still off, it means we are in a low-light environment and we should skip the sensor reading and go back to sleep immediately.
-        //     Serial.println("Low light detected on wakeup, going back to sleep...");
-        //     goToDeepSleep();
-        //     return;
-        // }
-        wakeSCDAfterDeepSleep ();
+        display.cls();
+        //display.setFont("ArialMT_Plain_16");
+        display.println("Calibration completed!\nUncover the LDR");
+        delay(4000);
+        display.displayOff();
+
         is_first_boot = 0;
     }
-    else scd41.wakeUp(); // TODO: is this required?
 
-    setLEDStatusGREEN(); 	// The green status LED will stay on while the board is in light sleep, only for debugging purposes
+    wakeSCDAfterDeepSleep();
+
+    setLEDStatusGREEN();
 
     dataMutex = xSemaphoreCreateMutex();
-
     if (dataMutex == NULL) Serial.println("Failed to create Data Mutex.");
 
     // Communication task
@@ -109,7 +137,10 @@ void setup() {
 
     // Prediction Task
     xTaskCreatePinnedToCore(
-        [](void * o) { Regression::processingTask(measurements); },
+        [](void * o) 
+        { 
+            Regression::processingTask(measurementIndex); 
+        },
         "ProcTask", 
         4096,
         NULL,
@@ -209,7 +240,7 @@ int getSCD41Reading (sensorMeasure &data) {
     Serial.printf ("CO2: %d ppm, Temp: %.2f °C, RH: %.2f %%\n", data.co2, data.temp, data.rh);
     Serial.printf (">co2:%d:%u|\n", measurementIndex, data.co2);
     Serial.printf (">temp:%d:%.2f|\n", measurementIndex, data.temp);
-    Serial.printf (">humidity:%d:%.2f|\n", measurementIndex++,  data.rh);
+    Serial.printf (">humidity:%d:%.2f|\n", measurementIndex,  data.rh);
     
     Serial.flush();
     scd41.powerDown();
@@ -231,7 +262,7 @@ void checkLevels(sensorMeasure data) {
 }
 
 void wakeSCDAfterDeepSleep() {	
-	scd41.begin(Wire, SCD41_I2C_ADDR_62);
+    scd41.begin(Wire1, SCD41_I2C_ADDR_62);
 
     uint64_t scd41SerialNumber;
 
@@ -261,7 +292,7 @@ void wakeSCDAfterDeepSleep() {
     Serial.println("Power on procedure completed with SUCCESS!");
 
     setLEDStatusGREEN();
-    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(2000));
     setLEDStatusOFF();
 }
 

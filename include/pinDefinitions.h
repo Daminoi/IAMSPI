@@ -31,14 +31,16 @@
 #define SCL_GPIO    42
 
 #define LDR_POWER   06
-
 #define LDR_INPUT   07
 
 #define BTN_PWR     40
-
 #define BTN_SENSE   02
 
 #define VE_ENABLE   36
+
+#define OLED_SDA    17
+#define OLED_SCL    18
+#define OLED_RST    21
 
 
 #endif /* PINDEFINITIONS_H */

@@ -62,12 +62,12 @@ PredictionResult Regression::calculateRegression(float nextX) {
 }
 
 // --- FreeRTOS Task ---
-void Regression::processingTask() {
-    PredictionResult trend = calculateRegression((float)measurementIndex);
+void Regression::processingTask(uint8_t msrmntIndex) {
+    PredictionResult trend = calculateRegression((float)msrmntIndex);
 
     Serial.printf("Current: %.2f | Calculated Slope: %.4f | Predicted Next: %.2f\n",
                   measurements[WINDOW_SIZE - 1].co2, trend.slope, trend.nextValue);
-    Serial.printf(">pred_co2:%d:%.2f|\n", measurementIndex, trend.nextValue);
+    Serial.printf(">pred_co2:%d:%.2f|\n", msrmntIndex, trend.nextValue);
 
     // Act based on the trend evaluation
     if (nCurrStoredMeasures >= WINDOW_SIZE && trend.nextValue > CO2_HIGH) {
@@ -76,5 +76,5 @@ void Regression::processingTask() {
         delay(1000); // Allow physical hardware action visibility before dropping power
     }
 
-    vTaskDelete(NULL); // Fallback safety catch
+    vTaskDelete(NULL);
 }
