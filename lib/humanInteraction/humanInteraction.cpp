@@ -264,3 +264,37 @@ uint8_t checkButtonAtLeastOnePress(uint16_t millisBtwChecks, uint16_t nChecks)
 
 	return 0;
 }
+
+void initDisplay(SSD1306Wire* display)
+{
+	pinMode(OLED_RST, OUTPUT);
+
+	digitalWrite(OLED_RST, LOW);
+    delay(50);
+    digitalWrite(OLED_RST, HIGH);
+    delay(50);
+
+	display->init();
+    display->flipScreenVertically();
+    display->setContrast(255);
+}
+
+void powerOnDisplay(SSD1306Wire* display)
+{
+	display->displayOn();
+}
+
+void powerOffDisplay(SSD1306Wire* display)
+{
+	display->displayOff();
+}
+
+void displayCls(SSD1306Wire* display)
+{
+	display->cls();
+}
+
+void displayClsAndPrintln(SSD1306Wire* display, const char* str){
+	display->cls();
+    display->println(str);
+}

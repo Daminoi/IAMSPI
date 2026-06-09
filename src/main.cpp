@@ -7,6 +7,8 @@
 #include "LoRa.h"
 #include "Data.h"
 
+#include "embeddedCredentials.h"
+
 #define SCD41_NO_ERROR 0
 
 // Persistent Memory (persists after Deep Sleep but not after a full power down-power up cicle)
@@ -19,6 +21,7 @@ RTC_DATA_ATTR struct sensorMeasure measurements[WINDOW_SIZE];
 RTC_DATA_ATTR uint8_t nCurrStoredMeasures;
 RTC_DATA_ATTR uint8_t measurementIndex;
 
+SSD1306Wire* OLEDdisplay;
 SensirionI2cScd4x scd41;    // Global Sensor Object
 int16_t scd41Error;
 char errorMessage[64];
@@ -27,14 +30,6 @@ const float cO2Alpha = 0.15;
 
 SemaphoreHandle_t dataMutex = NULL;
 TaskHandle_t loRaTaskHandle = NULL;
-
-uint8_t joinEui[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-
-// devEUI: 70B3D57ED0077AD5
-uint8_t devEui[] = { 0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x07, 0x7A, 0xD5 };
-
-// appKey: 46907A312CE3EB2A8FD83E97795287EA
-uint8_t appKey[] = { 0x46, 0x90, 0x7A, 0x31, 0x2C, 0xE3, 0xEB, 0x2A, 0x8F, 0xD8, 0x3E, 0x97, 0x79, 0x52, 0x87, 0xEA };
 
 
 void runSystemSequence();
@@ -51,34 +46,18 @@ void setup() {
     
     Wire1.begin(SDA_GPIO, SCL_GPIO);
     
-    SSD1306Wire display(0x3C, OLED_SDA, OLED_SCL, GEOMETRY_128_64, I2C_ONE);
-    pinMode(OLED_RST, OUTPUT);
-
-    digitalWrite(OLED_RST, LOW);
-    delay(50);
-    digitalWrite(OLED_RST, HIGH);
-    delay(50);
-
-    display.init();
-    display.displayOn();
-    display.flipScreenVertically();
-    display.setContrast(255);
-
-    //display.setFont("ArialMT_Plain_24");
-    display.println("IAMSPI v1.0");
+    OLEDdisplay = new SSD1306Wire(0x3C, OLED_SDA, OLED_SCL, GEOMETRY_128_64, I2C_ONE);
     
-    
-    pinMode(LDR_POWER, OUTPUT);
-    digitalWrite(LDR_INPUT, LOW); // low by default
-    
+    initDisplay(OLEDdisplay);
     initBuzzerGPIO();
     initLEDsGPIO();
     initButtonGPIO();
     
-    #ifdef DEBUG_MODE_ACTIVE
-    if(is_first_boot == 1)
-    startupSelfTestLedBuzzer();
-    #endif
+    pinMode(LDR_POWER, OUTPUT);
+    digitalWrite(LDR_INPUT, LOW); // low by default
+    
+    if(is_first_boot == 1) 
+        startupSelfTestLedBuzzer();
     
     // Serial initialization
     Serial.begin(115200);
@@ -87,13 +66,11 @@ void setup() {
     setLEDStatusOFF();
     Serial.flush();
 
+    // LDR calibration after a full power cicle
     if (is_first_boot == 1) {
         Serial.println("Booting up after full power cicle: performing light sensor calibration...");
 
-
-        display.cls();
-        //display.setFont("ArialMT_Plain_16");
-        display.println("LDR calibration:\n keep the LDR covered\n while pressing the button");
+        displayClsAndPrintln(OLEDdisplay, "LDR calibration:\n keep the LDR covered\n while pressing the button");
 
         activateButtonPower();
         while(checkButtonAtLeastOnePress(250, 100) == 0)
@@ -105,12 +82,9 @@ void setup() {
 
         LDR::setIlluminationBaseline();
 
-        
-        display.cls();
-        //display.setFont("ArialMT_Plain_16");
-        display.println("Calibration completed!\nUncover the LDR");
+        displayClsAndPrintln(OLEDdisplay, "Calibration completed!\nUncover the LDR");
         delay(4000);
-        display.displayOff();
+        powerOffDisplay(OLEDdisplay);
 
         is_first_boot = 0;
     }
@@ -122,8 +96,12 @@ void setup() {
     dataMutex = xSemaphoreCreateMutex();
     if (dataMutex == NULL) Serial.println("Failed to create Data Mutex.");
 
-    // Communication task
-    LoRaManager::begin(joinEui, devEui, appKey);
+    // 1. Communication task
+    #ifdef DEBUG_USE_EMBEDDED_CREDENTIALS
+    LoRaManager::begin(testJoinEui, testDevEui, testAppKey);
+    #else
+
+    #endif
 
     // 2. Start the main logic sequence as a Task
     xTaskCreate(
@@ -135,12 +113,9 @@ void setup() {
         &loRaTaskHandle
     );
 
-    // Prediction Task
+    // 3. Prediction Task
     xTaskCreatePinnedToCore(
-        [](void * o) 
-        { 
-            Regression::processingTask(measurementIndex); 
-        },
+        [](void * o) { Regression::processingTask(measurementIndex); },
         "ProcTask", 
         4096,
         NULL,
@@ -154,7 +129,7 @@ void loop() {
     vTaskDelete(NULL); 
 }
 
-// --- Main Logic Flow ---
+// Main logic flow
 void runSystemSequence() {
     sensorMeasure currentData;
     
