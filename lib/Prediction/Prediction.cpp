@@ -30,8 +30,9 @@ PredictionResult Regression::calculateRegression(float nextX) {
     }
 
     // When the CO2 reading flatlines, denom is very small making the slope very high.
-    // This causes spikes in the predicted CO2 readings even from the smallest changes, which is not desirable.
-    // To mitigate this issue, if the total data spread is less than 5 ppm, we treat it as a flatline.
+    // This causes spikes in the predicted CO2 readings even from the smallest changes, which is
+    // not desirable. To mitigate this issue, if the total data spread is less than 5 ppm,
+    // we treat it as a flatline.
     if ((maxVal - minVal) < 5.0f || (minVal - maxVal) < 5.0f) {
         res.slope = 0.0f;
         res.intercept = measurements[N-1].co2;
@@ -57,7 +58,9 @@ PredictionResult Regression::calculateRegression(float nextX) {
     res.slope = slope;
     res.intercept = intercept;
     res.nextValue = (slope * nextX) + intercept;
+    #ifdef DEBUG_MODE_ACTIVE
     Serial.printf ("Slope: %.4f, Intercept: %.2f, Next Predicted CO2: %.2f\n", slope, intercept, res.nextValue);
+    #endif
     return res;
 }
 
@@ -65,13 +68,19 @@ PredictionResult Regression::calculateRegression(float nextX) {
 void Regression::processingTask(uint8_t msrmntIndex) {
     PredictionResult trend = calculateRegression((float)msrmntIndex);
 
+    #ifdef DEBUG_MODE_ACTIVE
     Serial.printf("Current: %.2f | Calculated Slope: %.4f | Predicted Next: %.2f\n",
                   measurements[WINDOW_SIZE - 1].co2, trend.slope, trend.nextValue);
+                  // TODO: is this not the same as the pevious print?
     Serial.printf(">pred_co2:%d:%.2f|\n", msrmntIndex, trend.nextValue);
+    #endif
 
     // Act based on the trend evaluation
     if (nCurrStoredMeasures >= WINDOW_SIZE && trend.nextValue > CO2_HIGH) {
+        #ifdef DEBUG_MODE_ACTIVE
         Serial.println("WARNING: Air quality degrading rapidly! Activating air filter...");
+        #endif
+        // TODO:
         // digitalWrite(GPIO_NUM_2, HIGH); // Turn on peripheral actuator (fan, alert LED, etc.)
         delay(1000); // Allow physical hardware action visibility before dropping power
     }

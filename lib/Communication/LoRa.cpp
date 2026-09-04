@@ -15,7 +15,9 @@ void LoRaManager::begin(uint8_t* appEui, uint8_t* devEui, uint8_t* appKey) {
     heltec_setup();
     int16_t state = radio.begin();
     if (state != RADIOLIB_ERR_NONE) {
+        #ifdef DEBUG_MODE_ACTIVE
         Serial.printf("[LoRa] Hardware initialization failed! Code: %d\n", state);
+        #endif
         return;
     }
 
@@ -44,11 +46,11 @@ void LoRaManager::loraTaskWorker(void *pvParameters) {
     node = persist.manage(&radio, lwSessionStore);
     node->setSleepFunction(loRaSleepCallback);
 
+    #ifdef DEBUG_MODE_ACTIVE
     Serial.println("[LoRa] Node State: " + String(node->isActivated()));
-    
+    #endif
+
     if (!node->isActivated()) {
-        Serial.println("[LoRa Task] Configuring TTN OTAA credentials...");
-        
         node->beginOTAA(
             *((uint64_t*)keys->joinEui), 
             *((uint64_t*)keys->devEui), 
@@ -56,16 +58,23 @@ void LoRaManager::loraTaskWorker(void *pvParameters) {
             keys->appKey
         );
 
+        #ifdef DEBUG_MODE_ACTIVE
+        Serial.println("[LoRa Task] Configuring TTN OTAA credentials...");
         Serial.println("[LoRa Task] Broadcasting Join Request packet...");
+        #endif
         
         // This function blocks internally until the RX windows close or join succeeds!
         int16_t state = node->activateOTAA();
         
         if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_LORAWAN_NEW_SESSION) {
+            #ifdef DEBUG_MODE_ACTIVE
             Serial.println("[LoRa Task] Successfully Joined TTN!");
+            #endif
             persist.saveSession(node);
         } else {
+            #ifdef DEBUG_MODE_ACTIVE
             Serial.printf("[LoRa Task] OTAA Join Failed! Error Code: %d\n", state);
+            #endif
             delete keys;       
             vTaskDelete(NULL); 
             return;
@@ -102,15 +111,19 @@ void LoRaManager::loraTaskWorker(void *pvParameters) {
             payload[6] = (encodedRH >> 8) & 0xFF;
             payload[7] = encodedRH & 0xFF;
             
+            #ifdef DEBUG_MODE_ACTIVE
             Serial.printf("[LoRa Task] Uploading frame data #%d...\n", i);
-        
+            #endif
+
             String strDownlinkResponse = "";
             int16_t state = node->sendReceive(payload, sizeof(payload), 1, strDownlinkResponse);
 
+            #ifdef DEBUG_MODE_ACTIVE
             if (state == RADIOLIB_ERR_NONE)
                 Serial.println("[LoRa Task] Uplink broadcast complete!");
             else
                 Serial.printf("[LoRa Task] Transmission skipped/dropped. Error: %d\n", state);
+            #endif
         }
 
         // Signal back to main loop that transmission sequence finished

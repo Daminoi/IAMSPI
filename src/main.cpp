@@ -68,8 +68,9 @@ void setup() {
 
     // LDR calibration after a full power cicle
     if (is_first_boot == 1) {
+        #ifdef DEBUG_MODE_ACTIVE
         Serial.println("Booting up after full power cicle: performing light sensor calibration...");
-
+        #endif
         displayClsAndPrintln(OLEDdisplay, "LDR calibration:\n keep the LDR covered\n while pressing the button");
 
         activateButtonPower();
@@ -94,7 +95,10 @@ void setup() {
     setLEDStatusGREEN();
 
     dataMutex = xSemaphoreCreateMutex();
+    
+    #ifdef DEBUG_MODE_ACTIVE
     if (dataMutex == NULL) Serial.println("Failed to create Data Mutex.");
+    #endif
 
     // 1. Communication task
     #ifdef DEBUG_USE_EMBEDDED_CREDENTIALS
@@ -136,7 +140,9 @@ void runSystemSequence() {
     light_On = LDR::getIllumination();
     if (!light_On) {
         // If we woke up and the light is still off, it means we are in a low-light environment and we should skip the sensor reading and go back to sleep immediately.
+        #ifdef DEBUG_MODE_ACTIVE
         Serial.println("Low light detected on wakeup, going back to sleep...");
+        #endif
         goToDeepSleep();
         return;
     }
@@ -162,10 +168,14 @@ void runSystemSequence() {
             // Phase 3: Data Storage and Transmission (If buffer full or Alert)
             if (nCurrStoredMeasures < WINDOW_SIZE) {
                 measurements[nCurrStoredMeasures++] = currentData;
+                #ifdef DEBUG_MODE_ACTIVE
                 Serial.println("Data stored successfully.");
+                #endif
             }
             else if (nCurrStoredMeasures >= WINDOW_SIZE) {
+                #ifdef DEBUG_MODE_ACTIVE
                 Serial.println("Triggering LoRa Uplink...");
+                #endif
                 for (int i = 0; i < WINDOW_SIZE; i++) {
                     LoRaManager::measurementsCpy[i] = measurements[i];
                 }
@@ -173,18 +183,26 @@ void runSystemSequence() {
                 nCurrStoredMeasures = 0;
                 measurements[nCurrStoredMeasures++] = currentData;
             } else if (pre_alert == 1) {
+                #ifdef DEBUG_MODE_ACTIVE
                 Serial.println("Triggering LoRa Uplink...");
-                //LoRaManager::IsReadyForTransmission = true;
+                #endif
+                #ifndef DEBUG_MODE_ACTIVE
+                LoRaManager::IsReadyForTransmission = true;
+                #endif  
                 pre_alert = 0;
             }
             break;
         }
+        #ifdef DEBUG_MODE_ACTIVE
         Serial.println("Reading failed, retrying...");
+        #endif
     }
     
     while (!loRaTaskHandle || LoRaManager::IsReadyForTransmission) vTaskDelay(pdMS_TO_TICKS(500));
     // Phase 5: Shutdown
+    #ifdef DEBUG_MODE_ACTIVE
     Serial.println("Sequence complete, going to sleep...");
+    #endif
     goToDeepSleep();
 }
 
@@ -195,29 +213,37 @@ int getSCD41Reading (sensorMeasure &data) {
     
     // In the datasheet it is reported that the time necessary to take a sample is 5000 ms (5 seconds) maximum.
     // Therefore we can save power by going in LIGHT SLEEP mode while waiting for the SCD41 to take a sample.
+    #ifdef DEBUG_MODE_ACTIVE
     Serial.println("Sensor measuring (Light Sleep)...");
+    #endif
     esp_sleep_enable_timer_wakeup(5 * U_S_TO_S_FACTOR);
     esp_light_sleep_start();
     scd41Error = scd41.readMeasurement(data.co2, data.temp, data.rh);
     if (scd41Error != SCD41_NO_ERROR) {
-        Serial.println("Sensor Error!\nTrying again ...");
         errorToString(scd41Error, errorMessage, sizeof(errorMessage));
+        #ifdef DEBUG_MODE_ACTIVE
+        Serial.println("Sensor Error!\nTrying again ...");
         Serial.println(errorMessage);
+        #endif
         esp_sleep_enable_timer_wakeup(5 * U_S_TO_S_FACTOR);
         esp_light_sleep_start();
         if (scd41.readMeasurement(data.co2, data.temp, data.rh) != SCD41_NO_ERROR) {
+            #ifdef DEBUG_MODE_ACTIVE
             Serial.println("Sensor Error!");
+            #endif
             setLEDStatusRED();
         }
     }
 
 
+    #ifdef DEBUG_MODE_ACTIVE
     Serial.printf ("CO2: %d ppm, Temp: %.2f °C, RH: %.2f %%\n", data.co2, data.temp, data.rh);
     Serial.printf (">co2:%d:%u|\n", measurementIndex, data.co2);
     Serial.printf (">temp:%d:%.2f|\n", measurementIndex, data.temp);
     Serial.printf (">humidity:%d:%.2f|\n", measurementIndex,  data.rh);
-    
     Serial.flush();
+    #endif
+
     scd41.powerDown();
     return SCD41_NO_ERROR;
 }
@@ -244,7 +270,9 @@ void wakeSCDAfterDeepSleep() {
     setLEDStatusRED();
     scd41Error = scd41.wakeUp();
     if (scd41Error != SCD41_NO_ERROR) {
+        #ifdef DEBUG_MODE_ACTIVE
         Serial.println("Error while trying to wake up the SCD41!");
+        #endif
         unrecoverableErrorStatus();
     }
     setLEDStatusOFF();
@@ -253,19 +281,23 @@ void wakeSCDAfterDeepSleep() {
 	setLEDStatusRED();
 	scd41Error = scd41.getSerialNumber(scd41SerialNumber);
 	if (!scd41SerialNumber){
-		Serial.println("Failure to obtain the SCD41 serial number!");
+        #ifdef DEBUG_MODE_ACTIVE
+        Serial.println("Failure to obtain the SCD41 serial number!");
 		errorToString(scd41Error, errorMessage, sizeof(errorMessage));
 		Serial.println(errorMessage);
-		unrecoverableErrorStatus();
+		#endif
+        unrecoverableErrorStatus();
 	}
 	setLEDStatusOFF();
 
+    #ifdef DEBUG_MODE_ACTIVE
     Serial.print("SCD41's serial number: 0x");
     Serial.print((uint32_t)(scd41SerialNumber >> 32), HEX);
     Serial.println((uint32_t)(scd41SerialNumber & 0xFFFFFFFF), HEX);
 
     Serial.println("Power on procedure completed with SUCCESS!");
-
+    #endif
+    
     setLEDStatusGREEN();
     vTaskDelay(pdMS_TO_TICKS(2000));
     setLEDStatusOFF();
@@ -274,6 +306,8 @@ void wakeSCDAfterDeepSleep() {
 // puts esp32 to deep sleep
 // deep sleep entirely kills freertos tasks.
 void goToDeepSleep() {
+    #ifdef DEBUG_MODE_ACTIVE
     Serial.println("Entering Deep Sleep...");
+    #endif
     esp_deep_sleep(DEEP_SLEEP_SECONDS * U_S_TO_S_FACTOR);
 }

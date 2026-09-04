@@ -31,8 +31,10 @@ void LDR::setIlluminationBaseline() {
 
   	lightFiltered = lightInit;
 
+    #ifdef DEBUG_MODE_ACTIVE
   	Serial.print("Initial baseline: ");
   	Serial.println(lightInit);
+	#endif
 }
 
 bool LDR::getIllumination() {
@@ -49,9 +51,11 @@ bool LDR::getIllumination() {
   	lightsOn = lightFiltered > lightInit + lightOnThresholdDelta;
 
 
+    #ifdef DEBUG_MODE_ACTIVE
   	Serial.printf("LIGHT: raw= %f, filtered= %f, state= %s\n", (float)rawValue, lightFiltered, lightsOn ? "ON" : "OFF");
   	Serial.printf("LightInit: %f, Threshold: %f\n", (float)lightInit, (float)lightInit + lightOnThresholdDelta);
-  	
+  	#endif
+
 	return lightsOn;
 }
 
@@ -65,22 +69,3 @@ uint16_t LDR::readLDR () {
   	
 	return rawValue;
 }
-
-// notes:
-// value at 3:30PM is pretty high (on avg 3984)
-// with torch: 4095
-// inside class: 
-//    with lights off: 2502
-//    with lights on: 
-//        1 Light far off: 2592 - 2608
-//        2 Lights closer: 2930 - 3000
-
-// Connect one end of the photoresistor to 3.3V
-// Connect the other end of the photoresistor to GPIO7 / ADC6
-// At that same GPIO36 node, connect a fixed resistor to GND
-
-// That means:
-
-// analogRead(36) reads the voltage at the junction
-// more light → lower LDR resistance → higher voltage
-// less light → higher LDR resistance → lower voltage
